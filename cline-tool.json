@@ -1,0 +1,9 @@
+{
+  "name": "Binary Ninja MCP",
+  "description": "Analyze binaries via Binary Ninja MCP server",
+  "entry": "/home/matteius/Documents/Cline/MCP/bn-mcp/binaryninja_server.py",
+  "language": "json",
+  "tool": {
+    "type": "mcp"
+  }
+}
