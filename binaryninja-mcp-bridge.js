@@ -115,28 +115,61 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     let result;
     
+    // Log the arguments for debugging
+    console.error(`[DEBUG] Tool arguments: ${JSON.stringify(request.params.arguments)}`);
+    
+    // Check if arguments use 'file' instead of 'path'
+    if (request.params.arguments && request.params.arguments.file !== undefined && request.params.arguments.path === undefined) {
+      console.error(`[INFO] Converting 'file' parameter to 'path'`);
+      request.params.arguments.path = request.params.arguments.file;
+    }
+    
     switch (request.params.name) {
       case "get_binary_info": {
-        const args = FilePathSchema.parse(request.params.arguments);
-        result = await callBinaryNinjaServer("get_binary_info", args);
+        try {
+          const args = FilePathSchema.parse(request.params.arguments);
+          result = await callBinaryNinjaServer("get_binary_info", args);
+        } catch (error) {
+          console.error(`[ERROR] Failed to parse arguments for get_binary_info: ${error.message}`);
+          console.error(`[ERROR] Arguments received: ${JSON.stringify(request.params.arguments)}`);
+          throw error;
+        }
         break;
       }
 
       case "list_functions": {
-        const args = FilePathSchema.parse(request.params.arguments);
-        result = await callBinaryNinjaServer("list_functions", args);
+        try {
+          const args = FilePathSchema.parse(request.params.arguments);
+          result = await callBinaryNinjaServer("list_functions", args);
+        } catch (error) {
+          console.error(`[ERROR] Failed to parse arguments for list_functions: ${error.message}`);
+          console.error(`[ERROR] Arguments received: ${JSON.stringify(request.params.arguments)}`);
+          throw error;
+        }
         break;
       }
 
       case "disassemble_function": {
-        const args = FunctionSchema.parse(request.params.arguments);
-        result = await callBinaryNinjaServer("disassemble_function", args);
+        try {
+          const args = FunctionSchema.parse(request.params.arguments);
+          result = await callBinaryNinjaServer("disassemble_function", args);
+        } catch (error) {
+          console.error(`[ERROR] Failed to parse arguments for disassemble_function: ${error.message}`);
+          console.error(`[ERROR] Arguments received: ${JSON.stringify(request.params.arguments)}`);
+          throw error;
+        }
         break;
       }
 
       case "decompile_function": {
-        const args = FunctionSchema.parse(request.params.arguments);
-        result = await callBinaryNinjaServer("decompile_function", args);
+        try {
+          const args = FunctionSchema.parse(request.params.arguments);
+          result = await callBinaryNinjaServer("decompile_function", args);
+        } catch (error) {
+          console.error(`[ERROR] Failed to parse arguments for decompile_function: ${error.message}`);
+          console.error(`[ERROR] Arguments received: ${JSON.stringify(request.params.arguments)}`);
+          throw error;
+        }
         break;
       }
 

@@ -41,6 +41,19 @@ MCP_TOOLS = [
         }
     },
     {
+        "name": "get_function",
+        "description": "Get information about a specific function",
+        "streaming": False,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string"},
+                "function": {"type": "string"}
+            },
+            "required": ["path", "function"]
+        }
+    },
+    {
         "name": "disassemble_function",
         "description": "Disassemble function",
         "streaming": False,
@@ -64,6 +77,97 @@ MCP_TOOLS = [
                 "function": {"type": "string"}
             },
             "required": ["path", "function"]
+        }
+    },
+    {
+        "name": "list_sections",
+        "description": "List sections/segments in the binary",
+        "streaming": False,
+        "inputSchema": {
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"]
+        }
+    },
+    {
+        "name": "list_imports",
+        "description": "List imported functions",
+        "streaming": False,
+        "inputSchema": {
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"]
+        }
+    },
+    {
+        "name": "list_exports",
+        "description": "List exported symbols",
+        "streaming": False,
+        "inputSchema": {
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"]
+        }
+    },
+    {
+        "name": "list_namespaces",
+        "description": "List C++ namespaces",
+        "streaming": False,
+        "inputSchema": {
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"]
+        }
+    },
+    {
+        "name": "list_data",
+        "description": "List defined data variables",
+        "streaming": False,
+        "inputSchema": {
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"]
+        }
+    },
+    {
+        "name": "search_functions",
+        "description": "Search functions by name",
+        "streaming": False,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string"},
+                "query": {"type": "string"}
+            },
+            "required": ["path", "query"]
+        }
+    },
+    {
+        "name": "rename_function",
+        "description": "Rename a function",
+        "streaming": False,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string"},
+                "old_name": {"type": "string"},
+                "new_name": {"type": "string"}
+            },
+            "required": ["path", "old_name", "new_name"]
+        }
+    },
+    {
+        "name": "rename_data",
+        "description": "Rename a data variable",
+        "streaming": False,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string"},
+                "address": {"type": "string"},
+                "new_name": {"type": "string"}
+            },
+            "required": ["path", "address", "new_name"]
         }
     }
 ]
@@ -262,6 +366,174 @@ class BinaryNinjaMCPHandler(BaseHTTPRequestHandler):
                 logger.debug(f"Decompiling function {func} in file: {path}")
                 hlil = self.client.get_hlil(path, function_name=func)
                 return self._wrap_result(request_id, "\n".join(hlil) if isinstance(hlil, list) else str(hlil))
+
+            elif method == "get_function":
+                path = params.get("path")
+                func = params.get("function")
+                if not path:
+                    logger.error("Missing 'path' parameter")
+                    return self._error_response(request_id, -32602, "Missing 'path' parameter")
+                if not func:
+                    logger.error("Missing 'function' parameter")
+                    return self._error_response(request_id, -32602, "Missing 'function' parameter")
+                if not isinstance(path, str):
+                    logger.error(f"Invalid path type: {type(path)}")
+                    return self._error_response(request_id, -32602, "Parameter 'path' must be a string")
+                if not isinstance(func, str):
+                    logger.error(f"Invalid function type: {type(func)}")
+                    return self._error_response(request_id, -32602, "Parameter 'function' must be a string")
+                
+                logger.debug(f"Getting function info for {func} in file: {path}")
+                func_info = self.client.get_function(path, function_name=func)
+                if func_info:
+                    return self._wrap_result(request_id, json.dumps(func_info, indent=2))
+                else:
+                    return self._error_response(request_id, -32602, f"Function '{func}' not found")
+
+            elif method == "list_sections":
+                path = params.get("path")
+                if not path:
+                    logger.error("Missing 'path' parameter")
+                    return self._error_response(request_id, -32602, "Missing 'path' parameter")
+                if not isinstance(path, str):
+                    logger.error(f"Invalid path type: {type(path)}")
+                    return self._error_response(request_id, -32602, "Parameter 'path' must be a string")
+                
+                logger.debug(f"Listing sections for file: {path}")
+                sections = self.client.get_sections(path)
+                return self._wrap_result(request_id, json.dumps(sections, indent=2))
+
+            elif method == "list_imports":
+                path = params.get("path")
+                if not path:
+                    logger.error("Missing 'path' parameter")
+                    return self._error_response(request_id, -32602, "Missing 'path' parameter")
+                if not isinstance(path, str):
+                    logger.error(f"Invalid path type: {type(path)}")
+                    return self._error_response(request_id, -32602, "Parameter 'path' must be a string")
+                
+                logger.debug(f"Listing imports for file: {path}")
+                imports = self.client.get_imports()
+                return self._wrap_result(request_id, json.dumps(imports, indent=2))
+
+            elif method == "list_exports":
+                path = params.get("path")
+                if not path:
+                    logger.error("Missing 'path' parameter")
+                    return self._error_response(request_id, -32602, "Missing 'path' parameter")
+                if not isinstance(path, str):
+                    logger.error(f"Invalid path type: {type(path)}")
+                    return self._error_response(request_id, -32602, "Parameter 'path' must be a string")
+                
+                logger.debug(f"Listing exports for file: {path}")
+                exports = self.client.get_exports()
+                return self._wrap_result(request_id, json.dumps(exports, indent=2))
+
+            elif method == "list_namespaces":
+                path = params.get("path")
+                if not path:
+                    logger.error("Missing 'path' parameter")
+                    return self._error_response(request_id, -32602, "Missing 'path' parameter")
+                if not isinstance(path, str):
+                    logger.error(f"Invalid path type: {type(path)}")
+                    return self._error_response(request_id, -32602, "Parameter 'path' must be a string")
+                
+                logger.debug(f"Listing namespaces for file: {path}")
+                namespaces = self.client.get_namespaces()
+                return self._wrap_result(request_id, json.dumps(namespaces, indent=2))
+
+            elif method == "list_data":
+                path = params.get("path")
+                if not path:
+                    logger.error("Missing 'path' parameter")
+                    return self._error_response(request_id, -32602, "Missing 'path' parameter")
+                if not isinstance(path, str):
+                    logger.error(f"Invalid path type: {type(path)}")
+                    return self._error_response(request_id, -32602, "Parameter 'path' must be a string")
+                
+                logger.debug(f"Listing data variables for file: {path}")
+                data_items = self.client.get_defined_data()
+                return self._wrap_result(request_id, json.dumps(data_items, indent=2))
+
+            elif method == "search_functions":
+                path = params.get("path")
+                query = params.get("query")
+                if not path:
+                    logger.error("Missing 'path' parameter")
+                    return self._error_response(request_id, -32602, "Missing 'path' parameter")
+                if not query:
+                    logger.error("Missing 'query' parameter")
+                    return self._error_response(request_id, -32602, "Missing 'query' parameter")
+                if not isinstance(path, str):
+                    logger.error(f"Invalid path type: {type(path)}")
+                    return self._error_response(request_id, -32602, "Parameter 'path' must be a string")
+                if not isinstance(query, str):
+                    logger.error(f"Invalid query type: {type(query)}")
+                    return self._error_response(request_id, -32602, "Parameter 'query' must be a string")
+                
+                logger.debug(f"Searching functions with query '{query}' in file: {path}")
+                matches = self.client.search_functions(query)
+                return self._wrap_result(request_id, json.dumps(matches, indent=2))
+
+            elif method == "rename_function":
+                path = params.get("path")
+                old_name = params.get("old_name")
+                new_name = params.get("new_name")
+                if not path:
+                    logger.error("Missing 'path' parameter")
+                    return self._error_response(request_id, -32602, "Missing 'path' parameter")
+                if not old_name:
+                    logger.error("Missing 'old_name' parameter")
+                    return self._error_response(request_id, -32602, "Missing 'old_name' parameter")
+                if not new_name:
+                    logger.error("Missing 'new_name' parameter")
+                    return self._error_response(request_id, -32602, "Missing 'new_name' parameter")
+                if not isinstance(path, str):
+                    logger.error(f"Invalid path type: {type(path)}")
+                    return self._error_response(request_id, -32602, "Parameter 'path' must be a string")
+                if not isinstance(old_name, str):
+                    logger.error(f"Invalid old_name type: {type(old_name)}")
+                    return self._error_response(request_id, -32602, "Parameter 'old_name' must be a string")
+                if not isinstance(new_name, str):
+                    logger.error(f"Invalid new_name type: {type(new_name)}")
+                    return self._error_response(request_id, -32602, "Parameter 'new_name' must be a string")
+                
+                logger.debug(f"Renaming function from '{old_name}' to '{new_name}' in file: {path}")
+                success = self.client.rename_function(old_name, new_name)
+                if success:
+                    return self._wrap_result(request_id, json.dumps({"success": True, "message": f"Function renamed from '{old_name}' to '{new_name}'"}, indent=2))
+                else:
+                    return self._error_response(request_id, -32602, f"Failed to rename function '{old_name}' to '{new_name}'")
+
+            elif method == "rename_data":
+                path = params.get("path")
+                address = params.get("address")
+                new_name = params.get("new_name")
+                if not path:
+                    logger.error("Missing 'path' parameter")
+                    return self._error_response(request_id, -32602, "Missing 'path' parameter")
+                if not address:
+                    logger.error("Missing 'address' parameter")
+                    return self._error_response(request_id, -32602, "Missing 'address' parameter")
+                if not new_name:
+                    logger.error("Missing 'new_name' parameter")
+                    return self._error_response(request_id, -32602, "Missing 'new_name' parameter")
+                if not isinstance(path, str):
+                    logger.error(f"Invalid path type: {type(path)}")
+                    return self._error_response(request_id, -32602, "Parameter 'path' must be a string")
+                if not isinstance(address, str):
+                    logger.error(f"Invalid address type: {type(address)}")
+                    return self._error_response(request_id, -32602, "Parameter 'address' must be a string")
+                if not isinstance(new_name, str):
+                    logger.error(f"Invalid new_name type: {type(new_name)}")
+                    return self._error_response(request_id, -32602, "Parameter 'new_name' must be a string")
+                
+                logger.debug(f"Renaming data at address '{address}' to '{new_name}' in file: {path}")
+                success = self.client.rename_data(address, new_name)
+                if success:
+                    return self._wrap_result(request_id, json.dumps({"success": True, "message": f"Data at address '{address}' renamed to '{new_name}'"}, indent=2))
+                else:
+                    return self._error_response(request_id, -32602, f"Failed to rename data at address '{address}' to '{new_name}'")
 
             elif method == "cancel":
                 logger.debug("Cancel requested — not implemented.")

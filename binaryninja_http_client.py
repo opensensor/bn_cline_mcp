@@ -109,9 +109,29 @@ class BinaryNinjaHTTPClient:
     def list_functions(self, file_path=None):
         """List all functions in the currently open binary file."""
         try:
-            # Get the functions
-            response = self._request('GET', 'functions')
-            return response.get("functions", [])
+            # Get all functions with pagination
+            all_functions = []
+            offset = 0
+            limit = 100
+            
+            while True:
+                response = self._request('GET', 'functions', params={"offset": offset, "limit": limit})
+                functions = response.get("functions", [])
+                
+                if not functions:
+                    break
+                    
+                all_functions.extend(functions)
+                
+                # If we got fewer functions than the limit, we've reached the end
+                if len(functions) < limit:
+                    break
+                    
+                # Move to the next page
+                offset += limit
+                
+            logger.info(f"Retrieved {len(all_functions)} functions in total")
+            return all_functions
         except Exception as e:
             logger.error(f"Failed to list functions: {e}")
             raise
@@ -224,9 +244,29 @@ class BinaryNinjaHTTPClient:
     def get_sections(self, file_path=None):
         """Get all sections in a binary file."""
         try:
-            # Use the segments endpoint
-            response = self._request('GET', 'segments')
-            return response.get("segments", [])
+            # Get all segments with pagination
+            all_segments = []
+            offset = 0
+            limit = 100
+            
+            while True:
+                response = self._request('GET', 'segments', params={"offset": offset, "limit": limit})
+                segments = response.get("segments", [])
+                
+                if not segments:
+                    break
+                    
+                all_segments.extend(segments)
+                
+                # If we got fewer segments than the limit, we've reached the end
+                if len(segments) < limit:
+                    break
+                    
+                # Move to the next page
+                offset += limit
+                
+            logger.info(f"Retrieved {len(all_segments)} segments in total")
+            return all_segments
         except Exception as e:
             logger.error(f"Failed to get sections: {e}")
             raise
@@ -254,8 +294,29 @@ class BinaryNinjaHTTPClient:
     def get_imports(self, offset=0, limit=100):
         """Get list of imported functions."""
         try:
-            response = self._request('GET', 'imports', params={"offset": offset, "limit": limit})
-            return response.get("imports", [])
+            # Get all imports with pagination
+            all_imports = []
+            current_offset = 0
+            current_limit = limit
+            
+            while True:
+                response = self._request('GET', 'imports', params={"offset": current_offset, "limit": current_limit})
+                imports = response.get("imports", [])
+                
+                if not imports:
+                    break
+                    
+                all_imports.extend(imports)
+                
+                # If we got fewer imports than the limit, we've reached the end
+                if len(imports) < current_limit:
+                    break
+                    
+                # Move to the next page
+                current_offset += current_limit
+                
+            logger.info(f"Retrieved {len(all_imports)} imports in total")
+            return all_imports
         except Exception as e:
             logger.error(f"Failed to get imports: {e}")
             raise
@@ -263,8 +324,29 @@ class BinaryNinjaHTTPClient:
     def get_exports(self, offset=0, limit=100):
         """Get list of exported symbols."""
         try:
-            response = self._request('GET', 'exports', params={"offset": offset, "limit": limit})
-            return response.get("exports", [])
+            # Get all exports with pagination
+            all_exports = []
+            current_offset = 0
+            current_limit = limit
+            
+            while True:
+                response = self._request('GET', 'exports', params={"offset": current_offset, "limit": current_limit})
+                exports = response.get("exports", [])
+                
+                if not exports:
+                    break
+                    
+                all_exports.extend(exports)
+                
+                # If we got fewer exports than the limit, we've reached the end
+                if len(exports) < current_limit:
+                    break
+                    
+                # Move to the next page
+                current_offset += current_limit
+                
+            logger.info(f"Retrieved {len(all_exports)} exports in total")
+            return all_exports
         except Exception as e:
             logger.error(f"Failed to get exports: {e}")
             raise
@@ -272,8 +354,29 @@ class BinaryNinjaHTTPClient:
     def get_namespaces(self, offset=0, limit=100):
         """Get list of C++ namespaces."""
         try:
-            response = self._request('GET', 'namespaces', params={"offset": offset, "limit": limit})
-            return response.get("namespaces", [])
+            # Get all namespaces with pagination
+            all_namespaces = []
+            current_offset = 0
+            current_limit = limit
+            
+            while True:
+                response = self._request('GET', 'namespaces', params={"offset": current_offset, "limit": current_limit})
+                namespaces = response.get("namespaces", [])
+                
+                if not namespaces:
+                    break
+                    
+                all_namespaces.extend(namespaces)
+                
+                # If we got fewer namespaces than the limit, we've reached the end
+                if len(namespaces) < current_limit:
+                    break
+                    
+                # Move to the next page
+                current_offset += current_limit
+                
+            logger.info(f"Retrieved {len(all_namespaces)} namespaces in total")
+            return all_namespaces
         except Exception as e:
             logger.error(f"Failed to get namespaces: {e}")
             raise
@@ -281,8 +384,29 @@ class BinaryNinjaHTTPClient:
     def get_defined_data(self, offset=0, limit=100):
         """Get list of defined data variables."""
         try:
-            response = self._request('GET', 'data', params={"offset": offset, "limit": limit})
-            return response.get("data", [])
+            # Get all defined data with pagination
+            all_data = []
+            current_offset = 0
+            current_limit = limit
+            
+            while True:
+                response = self._request('GET', 'data', params={"offset": current_offset, "limit": current_limit})
+                data_items = response.get("data", [])
+                
+                if not data_items:
+                    break
+                    
+                all_data.extend(data_items)
+                
+                # If we got fewer data items than the limit, we've reached the end
+                if len(data_items) < current_limit:
+                    break
+                    
+                # Move to the next page
+                current_offset += current_limit
+                
+            logger.info(f"Retrieved {len(all_data)} data items in total")
+            return all_data
         except Exception as e:
             logger.error(f"Failed to get defined data: {e}")
             raise
@@ -290,8 +414,29 @@ class BinaryNinjaHTTPClient:
     def search_functions(self, query, offset=0, limit=100):
         """Search functions by name."""
         try:
-            response = self._request('GET', 'searchFunctions', params={"query": query, "offset": offset, "limit": limit})
-            return response.get("matches", [])
+            # Get all matching functions with pagination
+            all_matches = []
+            current_offset = 0
+            current_limit = limit
+            
+            while True:
+                response = self._request('GET', 'searchFunctions', params={"query": query, "offset": current_offset, "limit": current_limit})
+                matches = response.get("matches", [])
+                
+                if not matches:
+                    break
+                    
+                all_matches.extend(matches)
+                
+                # If we got fewer matches than the limit, we've reached the end
+                if len(matches) < current_limit:
+                    break
+                    
+                # Move to the next page
+                current_offset += current_limit
+                
+            logger.info(f"Retrieved {len(all_matches)} matching functions in total")
+            return all_matches
         except Exception as e:
             logger.error(f"Failed to search functions: {e}")
             raise

@@ -14,5 +14,8 @@
     "node-fetch": "^3.3.2",
     "zod": "^3.22.4",
     "zod-to-json-schema": "^3.22.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0"
   }
 }

@@ -84,21 +84,68 @@ class BinaryNinjaClient {
   }
 
   /**
-   * Send a request to the Binary Ninja MCP server
+   * Send a request to the Binary Ninja MCP server with retry capability
    */
-  async sendRequest(method: string, params?: Record<string, any>): Promise<any> {
+  async sendRequest(
+    method: string, 
+    params?: Record<string, any>, 
+    options: { maxRetries?: number, retryDelay?: number } = {}
+  ): Promise<any> {
     if (!this.serverProcess || !this.rl) {
       throw new Error('Server not started');
     }
 
-    return new Promise((resolve, reject) => {
-      const id = this.requestId++;
-      const request: McpRequest = { id, method, params };
-      
-      this.pendingRequests.set(id, { resolve, reject });
-      
-      this.serverProcess!.stdin!.write(JSON.stringify(request) + '\n');
-    });
+    const maxRetries = options.maxRetries ?? 3;
+    const retryDelay = options.retryDelay ?? 1000;
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await new Promise((resolve, reject) => {
+          const id = this.requestId++;
+          const request: McpRequest = { id, method, params };
+          
+          // Set a timeout to handle cases where the server doesn't respond
+          const timeoutId = setTimeout(() => {
+            if (this.pendingRequests.has(id)) {
+              this.pendingRequests.delete(id);
+              reject(new Error(`Request timed out after 30 seconds: ${method}`));
+            }
+          }, 30000); // 30 second timeout
+          
+          this.pendingRequests.set(id, { 
+            resolve: (value: any) => {
+              clearTimeout(timeoutId);
+              resolve(value);
+            }, 
+            reject: (error: any) => {
+              clearTimeout(timeoutId);
+              reject(error);
+            }
+          });
+          
+          this.serverProcess!.stdin!.write(JSON.stringify(request) + '\n');
+        });
+      } catch (error: unknown) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        lastError = err;
+        
+        // If this was the last retry, throw the error
+        if (attempt === maxRetries) {
+          throw err;
+        }
+        
+        // Log the retry attempt
+        console.error(`Request failed (attempt ${attempt + 1}/${maxRetries + 1}): ${err.message}`);
+        console.error(`Retrying in ${retryDelay}ms...`);
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+    }
+
+    // This should never be reached due to the throw in the loop, but TypeScript doesn't know that
+    throw lastError || new Error('Unknown error');
   }
 
   /**
@@ -141,6 +188,13 @@ class BinaryNinjaClient {
   }
 
   /**
+   * Get detailed information about a specific function
+   */
+  async getFunction(path: string, functionName: string): Promise<any> {
+    return this.sendRequest('get_function', { path, function: functionName });
+  }
+
+  /**
    * Disassemble a function in a binary file
    */
   async disassembleFunction(path: string, functionName: string): Promise<string[]> {
@@ -148,10 +202,59 @@ class BinaryNinjaClient {
   }
 
   /**
-   * List all sections in a binary file
+   * List all sections/segments in a binary file
    */
   async listSections(path: string): Promise<any[]> {
     return this.sendRequest('list_sections', { path });
+  }
+
+  /**
+   * List all imported functions in a binary file
+   */
+  async listImports(path: string): Promise<any[]> {
+    return this.sendRequest('list_imports', { path });
+  }
+
+  /**
+   * List all exported symbols in a binary file
+   */
+  async listExports(path: string): Promise<any[]> {
+    return this.sendRequest('list_exports', { path });
+  }
+
+  /**
+   * List all C++ namespaces in a binary file
+   */
+  async listNamespaces(path: string): Promise<string[]> {
+    return this.sendRequest('list_namespaces', { path });
+  }
+
+  /**
+   * List all defined data variables in a binary file
+   */
+  async listData(path: string): Promise<any[]> {
+    return this.sendRequest('list_data', { path });
+  }
+
+  /**
+   * Search for functions by name
+   */
+  async searchFunctions(path: string, query: string): Promise<any[]> {
+    return this.sendRequest('search_functions', { path, query });
+  }
+
+  /**
+   * Rename a function
+   */
+  async renameFunction(path: string, oldName: string, newName: string): Promise<any> {
+    return this.sendRequest('rename_function', { path, old_name: oldName, new_name: newName });
+  }
+
+  /**
+   * Rename a data variable
+   */
+  async renameData(path: string, address: string, newName: string): Promise<any> {
+    return this.sendRequest('rename_data', { path, address, new_name: newName });
   }
 
   /**
@@ -220,6 +323,214 @@ class BinaryNinjaClient {
       path, 
       output_dir: outputDir
     });
+  }
+
+  /**
+   * Analyze a binary file and generate a comprehensive report
+   */
+  async analyzeFile(path: string, outputPath?: string): Promise<any> {
+    // This is a higher-level function that combines multiple API calls
+    // to generate a comprehensive analysis report
+    const report: any = {
+      file_info: await this.getBinaryInfo(path),
+      sections: await this.listSections(path),
+      functions: [],
+      imports: await this.listImports(path),
+      exports: await this.listExports(path),
+      namespaces: await this.listNamespaces(path),
+      data_variables: await this.listData(path),
+      timestamp: new Date().toISOString()
+    };
+
+    // Get detailed information for the first 10 functions
+    const functionNames = await this.listFunctions(path);
+    report.function_count = functionNames.length;
+    
+    const sampleFunctions = functionNames.slice(0, 10);
+    for (const funcName of sampleFunctions) {
+      try {
+        const funcInfo = await this.getFunction(path, funcName);
+        const decompiled = await this.decompileFunction(path, funcName);
+        report.functions.push({
+          ...funcInfo,
+          decompiled: decompiled
+        });
+      } catch (err) {
+        console.error(`Error analyzing function ${funcName}: ${err}`);
+      }
+    }
+
+    // Save the report to a file if outputPath is provided
+    if (outputPath) {
+      const fs = require('fs');
+      const reportJson = JSON.stringify(report, null, 2);
+      fs.writeFileSync(outputPath, reportJson);
+    }
+
+    return report;
+  }
+
+  /**
+   * Find potential vulnerabilities in a binary file
+   */
+  async findVulnerabilities(path: string): Promise<any[]> {
+    // This is a higher-level function that analyzes the binary for potential vulnerabilities
+    const vulnerabilities: any[] = [];
+    
+    try {
+      // Get all functions
+      const functionNames = await this.listFunctions(path);
+      
+      // Look for potentially vulnerable functions
+      const dangerousFunctions = [
+        'strcpy', 'strcat', 'sprintf', 'gets', 'memcpy', 'system',
+        'exec', 'popen', 'scanf', 'malloc', 'free', 'realloc'
+      ];
+      
+      // Search for each dangerous function
+      for (const dangerFunc of dangerousFunctions) {
+        try {
+          const matches = await this.searchFunctions(path, dangerFunc);
+          
+          for (const match of matches) {
+            // Get more details about the function
+            const decompiled = await this.decompileFunction(path, match.name);
+            
+            vulnerabilities.push({
+              type: 'dangerous_function',
+              function_name: match.name,
+              dangerous_call: dangerFunc,
+              address: match.address,
+              decompiled: decompiled
+            });
+          }
+        } catch (err) {
+          console.error(`Error searching for ${dangerFunc}: ${err}`);
+        }
+      }
+      
+      // Look for string format vulnerabilities
+      try {
+        const printfMatches = await this.searchFunctions(path, 'printf');
+        for (const match of printfMatches) {
+          const decompiled = await this.decompileFunction(path, match.name);
+          
+          // Simple heuristic: if printf is called with a variable as first argument
+          if (decompiled && decompiled.includes('printf(') && !decompiled.includes('printf("%')) {
+            vulnerabilities.push({
+              type: 'format_string',
+              function_name: match.name,
+              address: match.address,
+              decompiled: decompiled
+            });
+          }
+        }
+      } catch (err) {
+        console.error(`Error analyzing format string vulnerabilities: ${err}`);
+      }
+    } catch (err) {
+      console.error(`Error finding vulnerabilities: ${err}`);
+    }
+    
+    return vulnerabilities;
+  }
+
+  /**
+   * Compare two binary files and identify differences
+   */
+  async compareBinaries(path1: string, path2: string): Promise<any> {
+    // This is a higher-level function that compares two binaries
+    const comparison: any = {
+      file1: await this.getBinaryInfo(path1),
+      file2: await this.getBinaryInfo(path2),
+      differences: {
+        functions: {
+          only_in_file1: [],
+          only_in_file2: [],
+          modified: []
+        },
+        sections: {
+          only_in_file1: [],
+          only_in_file2: [],
+          modified: []
+        }
+      }
+    };
+    
+    // Compare functions
+    const functions1 = await this.listFunctions(path1);
+    const functions2 = await this.listFunctions(path2);
+    
+    // Find functions only in file1
+    for (const func of functions1) {
+      if (!functions2.includes(func)) {
+        comparison.differences.functions.only_in_file1.push(func);
+      }
+    }
+    
+    // Find functions only in file2
+    for (const func of functions2) {
+      if (!functions1.includes(func)) {
+        comparison.differences.functions.only_in_file2.push(func);
+      }
+    }
+    
+    // Compare common functions
+    const commonFunctions = functions1.filter(f => functions2.includes(f));
+    for (const func of commonFunctions) {
+      try {
+        const decompiled1 = await this.decompileFunction(path1, func);
+        const decompiled2 = await this.decompileFunction(path2, func);
+        
+        if (decompiled1 !== decompiled2) {
+          comparison.differences.functions.modified.push({
+            name: func,
+            file1_code: decompiled1,
+            file2_code: decompiled2
+          });
+        }
+      } catch (err) {
+        console.error(`Error comparing function ${func}: ${err}`);
+      }
+    }
+    
+    // Compare sections
+    const sections1 = await this.listSections(path1);
+    const sections2 = await this.listSections(path2);
+    
+    const sectionNames1 = sections1.map(s => s.name);
+    const sectionNames2 = sections2.map(s => s.name);
+    
+    // Find sections only in file1
+    for (const section of sections1) {
+      if (!sectionNames2.includes(section.name)) {
+        comparison.differences.sections.only_in_file1.push(section);
+      }
+    }
+    
+    // Find sections only in file2
+    for (const section of sections2) {
+      if (!sectionNames1.includes(section.name)) {
+        comparison.differences.sections.only_in_file2.push(section);
+      }
+    }
+    
+    // Compare common sections
+    const commonSectionNames = sectionNames1.filter(s => sectionNames2.includes(s));
+    for (const sectionName of commonSectionNames) {
+      const section1 = sections1.find(s => s.name === sectionName);
+      const section2 = sections2.find(s => s.name === sectionName);
+      
+      if (section1.size !== section2.size || section1.start !== section2.start) {
+        comparison.differences.sections.modified.push({
+          name: sectionName,
+          file1_section: section1,
+          file2_section: section2
+        });
+      }
+    }
+    
+    return comparison;
   }
 }
 
