@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/opensensor-bn-cline-mcp-badge.png)](https://mseep.ai/app/opensensor-bn-cline-mcp)
+
 # binary_ninja_cline_mcp
 An MCP server for Cline that works with Binary Ninja (Personal License)
 
