@@ -1,0 +1,14 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+anthropic = ">=0.49.0"
+fastmcp = ">=2.0.0"
+requests = ">=2.32.3"
+
+[dev-packages]
+
+[requires]
+python_version = "3.13"
